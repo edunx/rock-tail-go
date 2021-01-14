@@ -2,7 +2,7 @@ package tail
 
 import (
 	"github.com/edunx/lua"
-	"github.com/edunx/public"
+	pub "github.com/edunx/public"
 )
 
 const (
@@ -33,16 +33,16 @@ func CreateTailUserData(L *lua.LState) int {
 
 	go func() {
 		if err := tail.Start(); err != nil {
-			out.Err("tail start err: %v", err)
+			pub.Out.Err("tail start err: %v", err)
 		} else {
-			out.Debug("tail start success: %v", tail)
+			pub.Out.Debug("tail start success: %v", tail)
 		}
 	}()
 
 	return 1
 }
 
-func LuaInjectApi(L *lua.LState, parent *lua.LTable , output public.Logger) {
+func LuaInjectApi(L *lua.LState, parent *lua.LTable) {
 
 	mt := L.NewTypeMetatable(MT)
 
@@ -51,9 +51,6 @@ func LuaInjectApi(L *lua.LState, parent *lua.LTable , output public.Logger) {
 	L.SetField(mt, "__newindex", L.NewFunction(Set))
 
 	L.SetField(parent, "tail", L.NewFunction(CreateTailUserData))
-
-	//注入 out
-	out = output
 }
 
 func Get(L *lua.LState) int {
@@ -90,7 +87,7 @@ func Set(L *lua.LState) int {
 	case "buffer":
 		self.C.buffer = L.CheckInt(3)
 	case "transport":
-		self.transport = public.CheckTransport(L.CheckUserData(3))
+		self.transport = pub.CheckTransport(L.CheckUserData(3))
 	}
 	return 0
 }

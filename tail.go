@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"errors"
+	pub "github.com/edunx/public"
 	"github.com/fsnotify/fsnotify"
 	"io"
 	"os"
@@ -13,11 +14,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	pub "github.com/edunx/public"
 )
 
 var Offset = make(map[string]int64)
-var out pub.Logger
 
 type Config struct {
 	enable     string //开关
@@ -58,21 +57,21 @@ func (t *Tail) GetLoadOffset() {
 
 	offsetFile, err := os.OpenFile(t.C.offsetFile, os.O_RDONLY, 0666)
 	if err != nil {
-		out.Err("tail module open offset file error: %v", err)
+		pub.Out.Err("tail module open offset file error: %v", err)
 		return
 	}
 
 	defer func() {
 		err = offsetFile.Close()
 		if err != nil {
-			out.Err("tail module close offset file error: %v", err)
+			pub.Out.Err("tail module close offset file error: %v", err)
 			return
 		}
 	}()
 
 	err = gob.NewDecoder(offsetFile).Decode(&Offset)
 	if err != nil {
-		out.Err("gob decode offset file error: %v", err)
+		pub.Out.Err("gob decode offset file error: %v", err)
 		return
 	}
 }
@@ -88,7 +87,7 @@ func (t *Tail) SetFileOffset(file *os.File) error {
 	offset = Offset[name]
 
 	if tailPos, err = file.Seek(0, 2); err != nil {
-		out.Err("get file tail position for [%s] error : %v", file.Name(), err)
+		pub.Out.Err("get file tail position for [%s] error : %v", file.Name(), err)
 	}
 
 	// 如果当前文件尾部的offset小于保存的offset,则从当前文件的头部开始读取
@@ -98,12 +97,12 @@ func (t *Tail) SetFileOffset(file *os.File) error {
 
 	fromPos, err = file.Seek(offset, 0)
 	if err != nil {
-		out.Err("tail get file current position for [%s] error : %v", file.Name(), err)
+		pub.Out.Err("tail get file current position for [%s] error : %v", file.Name(), err)
 		return err
 	}
 
 	t.File = file
-	out.Info("tail read file [%s] from position %d", file.Name(), fromPos)
+	pub.Out.Info("tail read file [%s] from position %d", file.Name(), fromPos)
 	return nil
 }
 
@@ -117,30 +116,30 @@ func (t *Tail) SaveFileOffset() error {
 	// 获取当前位置
 	curPosition, err := t.File.Seek(0, 1)
 	if err != nil {
-		out.Err("get file current position for [%s] error : %v", name, err)
+		pub.Out.Err("get file current position for [%s] error : %v", name, err)
 		return err
 	}
 
-	out.Debug("current file offsetFile info: {Name: %s, offsetFile: %d}", name, curPosition)
+	pub.Out.Debug("current file offsetFile info: {Name: %s, offsetFile: %d}", name, curPosition)
 
 	Offset[name] = curPosition
 
 	offsetFile, err1 := os.OpenFile(t.C.offsetFile, os.O_CREATE|os.O_WRONLY, 0666)
 	if err1 != nil {
-		out.Err("open offsetFile file [%s] error: %v", t.C.offsetFile, err1)
+		pub.Out.Err("open offsetFile file [%s] error: %v", t.C.offsetFile, err1)
 		return err1
 	}
 
 	defer func() {
 		err1 = offsetFile.Close()
 		if err1 != nil {
-			out.Err("offsetFile file [%s] close error: %v", t.C.offsetFile, err1)
+			pub.Out.Err("offsetFile file [%s] close error: %v", t.C.offsetFile, err1)
 		}
 	}()
 
 	err1 = gob.NewEncoder(offsetFile).Encode(Offset)
 	if err1 != nil {
-		out.Err("gob encode offsetFile info error: %v", err1)
+		pub.Out.Err("gob encode offsetFile info error: %v", err1)
 		return err1
 	}
 
@@ -169,12 +168,12 @@ func (f *FileName) openFile(ctx context.Context) (*os.File, error) {
 			return fileStream, e
 		}
 
-		out.Err("file [%s] not exist, check after 5 seconds", name)
+		pub.Out.Err("file [%s] not exist, check after 5 seconds", name)
 
 		select {
 		case <-ctx.Done():
 			err := errors.New("open file error, no such file, and open canceled")
-			out.Err("%s", err)
+			pub.Out.Err("%s", err)
 			return nil, err
 		default:
 			time.Sleep(5 * time.Second)
@@ -188,15 +187,15 @@ func (t *Tail) signalCatch(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			out.Err("tail signal catch func exit")
+			pub.Out.Err("tail signal catch func exit")
 			return
 		case sig := <-t.signalChan:
 			switch sig {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 				if err := t.SaveFileOffset(); err != nil {
-					out.Err("save offsetFile for %s error: %v", t.File.Name(), err)
+					pub.Out.Err("save offsetFile for %s error: %v", t.File.Name(), err)
 				} else {
-					out.Info("save offsetFile for %s success", t.File.Name())
+					pub.Out.Info("save offsetFile for %s success", t.File.Name())
 				}
 				os.Exit(0)
 			}
@@ -210,11 +209,11 @@ func (t *Tail) Handler(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			out.Err("tail  handler exit")
+			pub.Out.Err("tail  handler exit")
 			return
 		default:
 			if t.Rd == nil {
-				out.Err("bufIo reader is nil, maybe no file opened, try again")
+				pub.Out.Err("bufIo reader is nil, maybe no file opened, try again")
 				time.Sleep(1 * time.Second)
 				continue
 			}
@@ -255,7 +254,7 @@ CHECK:
 	for {
 		select {
 		case <-ctx.Done():
-			out.Info("tail file update func exit")
+			pub.Out.Info("tail file update func exit")
 			return
 
 		case <-t.Eof:
@@ -265,7 +264,7 @@ CHECK:
 			}
 
 			if t.File.Name() != name {
-				out.Debug("new name: %s, old name: %s", name, t.File.Name())
+				pub.Out.Debug("new name: %s, old name: %s", name, t.File.Name())
 				t.DoUpdate(ctx)
 			}
 		case event, ok := <-t.Watcher.Events:
@@ -274,14 +273,14 @@ CHECK:
 			}
 
 			if event.Op&fsnotify.Remove == fsnotify.Remove && event.Name == t.File.Name() {
-				out.Err("file was removed: %s", t.File.Name())
+				pub.Out.Err("file was removed: %s", t.File.Name())
 				t.DoUpdate(ctx)
 			}
 		case err, ok := <-t.Watcher.Errors:
 			if !ok {
 				continue
 			}
-			out.Err("watcher get error: %v", err)
+			pub.Out.Err("watcher get error: %v", err)
 		}
 	}
 }
@@ -293,13 +292,13 @@ func (t *Tail) DirWatcher(ctx context.Context) {
 NEW:
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		out.Err("new watcher error: %v", err)
+		pub.Out.Err("new watcher error: %v", err)
 		goto NEW
 	}
 
 	defer func() {
 		if err := watcher.Close(); err != nil {
-			out.Err("close watcher error: %s", err)
+			pub.Out.Err("close watcher error: %s", err)
 		}
 	}()
 
@@ -313,7 +312,7 @@ ADD:
 	for {
 		select {
 		case <-ctx.Done():
-			out.Err("tail file watcher exit")
+			pub.Out.Err("tail file watcher exit")
 			return
 		case event, ok := <-watcher.Events:
 			if !ok {
@@ -321,14 +320,14 @@ ADD:
 			}
 
 			if event.Op&fsnotify.Remove == fsnotify.Remove && event.Name == t.File.Name() {
-				out.Err("file was removed: %s", t.File.Name())
+				pub.Out.Err("file was removed: %s", t.File.Name())
 				t.DoUpdate(ctx)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
 			}
-			out.Err("watcher get error: %v", err)
+			pub.Out.Err("watcher get error: %v", err)
 		}
 	}
 }
@@ -337,7 +336,7 @@ func (t *Tail) NewWatcher() {
 NEW:
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		out.Err("new watcher error: %v", err)
+		pub.Out.Err("new watcher error: %v", err)
 		goto NEW
 	}
 	t.Watcher = watcher
@@ -358,26 +357,26 @@ func (t *Tail) DoUpdate(ctx context.Context) {
 	var file *os.File
 
 	if err = t.SaveFileOffset(); err != nil {
-		out.Err("func DoUpdate save file offset error: %v", err)
+		pub.Out.Err("func DoUpdate save file offset error: %v", err)
 	}
 
 	file, err = t.FileName.openFile(ctx)
 	if err != nil {
-		out.Err("open new file [%s] error: %v", t.FileName.name, err)
+		pub.Out.Err("open new file [%s] error: %v", t.FileName.name, err)
 		return
 	}
 
 	if err := t.Watcher.Remove(t.File.Name()); err != nil {
-		out.Err("tail module file watcher remove path error: %v", err)
+		pub.Out.Err("tail module file watcher remove path error: %v", err)
 	}
 
 	if err = t.File.Close(); err != nil {
-		out.Err("close file [%s] error: %v", t.File.Name(), err)
+		pub.Out.Err("close file [%s] error: %v", t.File.Name(), err)
 	}
 
 	err = t.SetFileOffset(file)
 	if err != nil {
-		out.Err("set new file [%s] offset error: %v", t.FileName.name, err)
+		pub.Out.Err("set new file [%s] offset error: %v", t.FileName.name, err)
 	}
 
 	t.AddPath()
@@ -396,7 +395,7 @@ func (t *Tail) Start() error {
 	t.cancel = cancel
 
 	if t.C.enable != "on" {
-		out.Info("tail enable == off")
+		pub.Out.Info("tail enable == off")
 		return nil
 	}
 
@@ -417,7 +416,7 @@ func (t *Tail) Start() error {
 	}
 
 	pos, _ := t.File.Seek(0, 1)
-	out.Debug("the start position of [%s] is %d", t.File.Name(), pos)
+	pub.Out.Debug("the start position of [%s] is %d", t.File.Name(), pos)
 
 	t.Rd = bufio.NewReaderSize(t.File, t.C.buffer)
 	t.Status = true
@@ -444,22 +443,22 @@ func (t *Tail) Close() {
 
 	if !t.Status {
 		err := errors.New("tail is not running")
-		out.Err("tail close skip, cause %v", err)
+		pub.Out.Err("tail close skip, cause %v", err)
 		return
 	}
 
 	if err := t.SaveFileOffset(); err != nil {
-		out.Err("save file [%s] offset error: %v", t.File.Name(), err)
+		pub.Out.Err("save file [%s] offset error: %v", t.File.Name(), err)
 	}
 
 	if err := t.File.Close(); err != nil {
-		out.Err("file [%s] close error: %v", t.File.Name(), err)
+		pub.Out.Err("file [%s] close error: %v", t.File.Name(), err)
 	}
 
 	t.transport.Close()
 
 	if err := t.Watcher.Close(); err != nil {
-		out.Err("tail module file watcher close error: %v", err)
+		pub.Out.Err("tail module file watcher close error: %v", err)
 	}
 
 	t.Rd = nil
@@ -468,15 +467,15 @@ func (t *Tail) Close() {
 
 // Reload 更新配置后需要重新加载
 func (t *Tail) Reload() {
-	out.Debug("current tail config: %v", t.C)
+	pub.Out.Debug("current tail config: %v", t.C)
 
 	t.Close()
 
 	if err := t.Start(); err != nil {
-		out.Err("tail module restart error: %v", err)
+		pub.Out.Err("tail module restart error: %v", err)
 		return
 	}
 
 	t.Status = true
-	out.Info("tail module restart success")
+	pub.Out.Info("tail module restart success")
 }

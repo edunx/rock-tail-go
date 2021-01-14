@@ -3,7 +3,7 @@ package tail
 import (
 	"fmt"
 	"github.com/edunx/lua"
-	"github.com/edunx/public"
+	pub "github.com/edunx/public"
 	"github.com/spf13/cast"
 	"os"
 	"regexp"
@@ -31,7 +31,7 @@ func ParseFileName(name string) *FileName {
 
 	reg, err := regexp.Compile("{.*}")
 	if err != nil {
-		out.Err("reg compile error: %v", err)
+		pub.Out.Err("reg compile error: %v", err)
 		return &FileName{
 			name:      name,
 			layout:    "",
@@ -80,12 +80,12 @@ func CheckFile(fn *FileName) (*FileName, error) {
 			return fn, nil
 		}
 
-		out.Err("file got fail ,%v", err)
+		pub.Out.Err("file got fail ,%v", err)
 		return nil, err
 	}
 
 	if stat.IsDir() {
-		out.Err("tail path must file , got dir")
+		pub.Out.Err("tail path must file , got dir")
 		return nil, err
 	}
 
@@ -104,11 +104,11 @@ func CheckTailOffset(L *lua.LState, tb *lua.LTable) string {
 
 	stat, err := os.Stat(name)
 	if err != nil {
-		out.Err("no such offset file: %s, try to create it", name)
+		pub.Out.Err("no such offset file: %s, try to create it", name)
 
 		f, err1 := os.Create(name)
 		if err1 != nil {
-			out.Err("try to create offset file error: %v", err1)
+			pub.Out.Err("try to create offset file error: %v", err1)
 			L.RaiseError("get and create offset file error: %v", err)
 			return ""
 		}
