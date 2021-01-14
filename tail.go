@@ -436,6 +436,7 @@ func (t *Tail) Start() error {
 }
 
 func (t *Tail) Close() {
+
 	if t.cancel != nil {
 		t.cancel()
 		t.cancel = nil
