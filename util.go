@@ -129,8 +129,8 @@ func CheckTailOffset(L *lua.LState, tb *lua.LTable) string {
 
 }
 
-func CheckTransportByTable(L *lua.LState, tb *lua.LTable) public.Transport {
-	tp := public.CheckTransportByTable("transport", tb)
+func CheckTransportByTable(L *lua.LState, tb *lua.LTable) pub.Transport {
+	tp := pub.CheckTransportByTable("transport", tb)
 	if tp == nil {
 		L.RaiseError("invalid transport")
 		return nil
