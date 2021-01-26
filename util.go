@@ -3,7 +3,7 @@ package tail
 import (
 	"fmt"
 	"github.com/edunx/lua"
-	pub "github.com/edunx/public"
+	pub "github.com/edunx/rock-public-go"
 	"github.com/spf13/cast"
 	"os"
 	"regexp"

@@ -2,11 +2,11 @@ package tail
 
 import (
 	"github.com/edunx/lua"
-	pub "github.com/edunx/public"
+	pub "github.com/edunx/rock-public-go"
 )
 
 const (
-	MT string = "tail_mt"
+	MT string = "ROCK_PUBLIC_TAIL_MT"
 )
 
 func CreateTailUserData(L *lua.LState) int {

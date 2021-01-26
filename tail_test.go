@@ -9,25 +9,6 @@ import (
 	"time"
 )
 
-func TestSwitch(t *testing.T) {
-	a := 1
-	b := 2
-	a = b
-	fmt.Print(a)
-
-}
-
-func TestMap(t *testing.T) {
-	a := make(map[string]int)
-
-	a = nil
-	_, ok := a["test"]
-	if !ok {
-		fmt.Println(111)
-	}
-
-}
-
 func TestTail_Update(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	for {

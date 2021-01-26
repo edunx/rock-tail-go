@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"errors"
-	pub "github.com/edunx/public"
+	pub "github.com/edunx/rock-public-go"
 	"github.com/fsnotify/fsnotify"
 	"io"
 	"os"
