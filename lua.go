@@ -3,10 +3,11 @@ package tail
 import (
 	"github.com/edunx/lua"
 	pub "github.com/edunx/rock-public-go"
+	tp "github.com/edunx/rock-transport-go"
 )
 
 const (
-	MT string = "ROCK_PUBLIC_TAIL_MT"
+	MT string = "ROCK_TAIL_GO_MT"
 )
 
 func CreateTailUserData(L *lua.LState) int {
@@ -24,7 +25,7 @@ func CreateTailUserData(L *lua.LState) int {
 			buffer:     CheckTailBuffer(L, tb),
 		},
 
-		transport: CheckTransportByTable(L, tb),
+		transport: tp.CheckTunnelUserDataByTable(L , tb , "transport"),
 	}
 
 	ud.Value = tail
@@ -61,10 +62,9 @@ func Get(L *lua.LState) int {
 	case "transport":
 		L.Push(self.transport.ToUserData(L))
 	case "reload":
-		L.Push(L.NewFunction(func(L *lua.LState) int {
-			self.Reload()
-			return 0
-		}))
+		L.Push(L.NewFunction(self.reloadByLua))
+	case "close":
+		L.Push(L.NewFunction(self.closeByLua))
 	default:
 		L.Push(lua.LNil)
 	}
@@ -87,7 +87,7 @@ func Set(L *lua.LState) int {
 	case "buffer":
 		self.C.buffer = L.CheckInt(3)
 	case "transport":
-		self.transport = pub.CheckTransport(L.CheckUserData(3))
+		self.transport = tp.CheckTunnelUserData(L , 3)
 	}
 	return 0
 }
@@ -98,4 +98,14 @@ func (t *Tail) ToUserData(L *lua.LState) *lua.LUserData {
 	mt := L.GetTypeMetatable(MT)
 	L.SetMetatable(ud, mt)
 	return ud
+}
+
+func(self *Tail) reloadByLua(L *lua.LState) int {
+	self.Reload()
+	return  0
+}
+
+func(self *Tail) closeByLua(L *lua.LState) int {
+	self.Close()
+	return  0
 }

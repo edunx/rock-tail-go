@@ -129,16 +129,6 @@ func CheckTailOffset(L *lua.LState, tb *lua.LTable) string {
 
 }
 
-func CheckTransportByTable(L *lua.LState, tb *lua.LTable) pub.Transport {
-	tp := pub.CheckTransportByTable("transport", tb)
-	if tp == nil {
-		L.RaiseError("invalid transport")
-		return nil
-	}
-
-	return tp
-}
-
 func CheckTailBuffer(L *lua.LState, tb *lua.LTable) int {
 	i := cast.ToInt(tb.RawGetString("buffer").String())
 	if i == 0 {

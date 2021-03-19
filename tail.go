@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	pub "github.com/edunx/rock-public-go"
+	tp  "github.com/edunx/rock-transport-go"
 	"github.com/fsnotify/fsnotify"
 	"io"
 	"os"
@@ -37,7 +38,7 @@ type FileName struct {
 type Tail struct {
 	C Config
 
-	transport pub.Transport //transport userdata
+	transport tp.Tunnel //transport userdata
 
 	FileName *FileName
 	File     *os.File          // 当前打开的文件句柄
