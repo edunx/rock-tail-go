@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/gob"
 	"errors"
+	"fmt"
+	"github.com/edunx/lua"
 	pub "github.com/edunx/rock-public-go"
-	tp  "github.com/edunx/rock-transport-go"
 	"github.com/fsnotify/fsnotify"
 	"io"
 	"os"
@@ -16,42 +17,6 @@ import (
 	"syscall"
 	"time"
 )
-
-var Offset = make(map[string]int64)
-
-type Config struct {
-	enable     string //开关
-	name       string //事件名称
-	path       string //tail -f 文件路径, 文件名格式: 0 (名字固定,如error.log); 1 (名字随时间变化)
-	offsetFile string //保存偏移量的文件, 不存在则创建
-	buffer     int    //缓冲区大小 default:4096
-}
-
-// 通过Config.path生成,用于获取和更新tail的文件名
-type FileName struct {
-	name      string // 配置的原始文件名,如access.{YYYY-MM-dd.HH}.log.ts 或 error.log
-	layout    string // {YYYY-MM-dd.HH}
-	layoutNew string // 格式, 2006-01-02.03 或 ""
-	logType   int    // 名字是否固定(0 固定, 1 不固定)
-}
-
-type Tail struct {
-	C Config
-
-	transport tp.Tunnel //transport userdata
-
-	FileName *FileName
-	File     *os.File          // 当前打开的文件句柄
-	Rd       *bufio.Reader     // bufio读取,随着File变化而变化
-	Eof      chan bool         // 当前文件是否读完
-	Watcher  *fsnotify.Watcher // 监控文件是否被删除
-
-	Status bool // tail 模块状态
-
-	signalChan chan os.Signal
-	//ctx        context.Context
-	cancel context.CancelFunc
-}
 
 // 从保存offset的文件中获取offset状态
 func (t *Tail) GetLoadOffset() {
@@ -234,7 +199,7 @@ func (t *Tail) Handler(ctx context.Context) {
 				continue
 			}
 			// 去除最后的回车
-			t.transport.Push(line[:len(line)-1])
+			t.transport.Write(line[:len(line)-1])
 		}
 	}
 }
@@ -420,7 +385,7 @@ func (t *Tail) Start() error {
 	pub.Out.Debug("the start position of [%s] is %d", t.File.Name(), pos)
 
 	t.Rd = bufio.NewReaderSize(t.File, t.C.buffer)
-	t.Status = true
+	t.status = lua.RUNNING
 
 	//if err := t.transport.Start(); err != nil {
 	//	return err
@@ -436,18 +401,19 @@ func (t *Tail) Start() error {
 	return nil
 }
 
-func (t *Tail) Close() {
+func (t *Tail) Close() error {
 
 	if t.cancel != nil {
 		t.cancel()
 		t.cancel = nil
 	}
 
-	if !t.Status {
+	if t.status == lua.INIT {
 		err := errors.New("tail is not running")
 		pub.Out.Err("tail close skip, cause %v", err)
-		return
+		return err
 	}
+
 
 	if err := t.SaveFileOffset(); err != nil {
 		pub.Out.Err("save file [%s] offset error: %v", t.File.Name(), err)
@@ -457,14 +423,14 @@ func (t *Tail) Close() {
 		pub.Out.Err("file [%s] close error: %v", t.File.Name(), err)
 	}
 
-	t.transport.Close()
-
 	if err := t.Watcher.Close(); err != nil {
 		pub.Out.Err("tail module file watcher close error: %v", err)
 	}
 
 	t.Rd = nil
-	t.Status = false
+	t.status = lua.CLOSE
+
+	return nil
 }
 
 // Reload 更新配置后需要重新加载
@@ -478,6 +444,37 @@ func (t *Tail) Reload() {
 		return
 	}
 
-	t.Status = true
+	t.status = lua.RUNNING
+
 	pub.Out.Info("tail module restart success")
+}
+
+func (t *Tail) ToJson() ( []byte , error ) {
+	buff := lua.NewJsonBuffer()
+
+	buff.Start("tail")
+
+	buff.WriteKV("name" , t.C.name , false)
+
+	buff.WriteKV("enable" , t.C.enable , false)
+
+	buff.WriteKV("path" , t.C.path, false)
+
+	buff.WriteKV("offset" , t.C.offsetFile, false)
+
+	buff.WriteKI("buffer" , t.C.buffer , false)
+
+	buff.WriteKO( "transport" , t.transport , true)
+
+	buff.End()
+	return buff.Bytes() , nil
+}
+
+func (t *Tail) Status() (string , error) {
+	return fmt.Sprintf("name:%s , status:%s , uptime:%s , line:%d" ,
+		t.Name() , t.status.String() , t.uptime, t.count) , nil
+}
+
+func (t *Tail) Name() string {
+	return t.C.name
 }

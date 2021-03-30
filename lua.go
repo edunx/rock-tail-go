@@ -2,19 +2,61 @@ package tail
 
 import (
 	"github.com/edunx/lua"
-	pub "github.com/edunx/rock-public-go"
-	tp "github.com/edunx/rock-transport-go"
 )
 
-const (
-	MT string = "ROCK_TAIL_GO_MT"
-)
+func (t *Tail) ToLightUserData(L *lua.LState) *lua.LightUserData {
+	ud := &lua.LightUserData{Value: t}
+	return ud
+}
 
-func CreateTailUserData(L *lua.LState) int {
-	tb := L.CheckTable(1)
+func (t *Tail) LReload(L *lua.LState , args *lua.Args) lua.LValue {
+	if e := t.Close(); e != nil {
+		L.RaiseError("reload tail.%s close fail" , t.Name())
+		return lua.LFalse
+	}
 
-	mt := L.GetTypeMetatable(MT)
-	ud := L.NewUserData()
+	if e := t.Start(); e != nil {
+		L.RaiseError("relad tail.%s start fail" , t.Name())
+		return lua.LFalse
+
+	}
+	return lua.LString(t.Name() + " reload succeed")
+}
+
+func (t *Tail) LClose(L *lua.LState , args *lua.Args) lua.LValue {
+	if e := t.Close();e != nil {
+		L.RaiseError("tail.%s close fail" , t.Name())
+		return lua.LNil
+	}
+	return lua.LString(t.Name() + " close succeed")
+}
+
+func (t *Tail) LStart(L *lua.LState , args *lua.Args) lua.LValue {
+	if e := t.Start(); e != nil {
+		L.RaiseError("tail.%s start fail" , t.Name())
+		return lua.LNil
+	}
+
+	return lua.LString(t.Name() + " start succeed")
+}
+
+func (t *Tail) LDebug(L *lua.LState , args *lua.Args) lua.LValue {
+	return lua.LNil
+}
+
+func (t *Tail) Index(L *lua.LState , key string) lua.LValue {
+
+	if key == "transport"  { return t.transport.ToLightUserData(L) }
+	if key == "reload"     { return lua.NewGFunction(t.LReload)    }
+	if key == "close"      { return lua.NewGFunction(t.LClose)     }
+	if key == "start"      { return lua.NewGFunction(t.LStart)     }
+	if key == "debug"      { return lua.NewGFunction(t.LDebug)     }
+
+	return lua.LNil
+}
+
+func injectTail(L *lua.LState , args *lua.Args) lua.LValue {
+	tb := args.CheckTable(L , 1)
 
 	tail := &Tail{
 		C: Config{
@@ -25,87 +67,13 @@ func CreateTailUserData(L *lua.LState) int {
 			buffer:     CheckTailBuffer(L, tb),
 		},
 
-		transport: tp.CheckTunnelUserDataByTable(L , tb , "transport"),
+		transport: lua.CheckIO(L , tb.RawGetString("transport")),
 	}
 
-	ud.Value = tail
-	L.SetMetatable(ud, mt)
-	L.Push(ud)
-
-	go func() {
-		if err := tail.Start(); err != nil {
-			pub.Out.Err("tail start err: %v", err)
-		} else {
-			pub.Out.Debug("tail start success: %v", tail)
-		}
-	}()
-
-	return 1
-}
-
-func LuaInjectApi(L *lua.LState, parent *lua.LTable) {
-
-	mt := L.NewTypeMetatable(MT)
-
-	L.SetField(mt, "__index", L.NewFunction(Get))
-
-	L.SetField(mt, "__newindex", L.NewFunction(Set))
-
-	L.SetField(parent, "tail", L.NewFunction(CreateTailUserData))
-}
-
-func Get(L *lua.LState) int {
-	self := CheckTailUserData(L, 1)
-	name := L.CheckString(2)
-
-	switch name {
-	case "transport":
-		L.Push(self.transport.ToUserData(L))
-	case "reload":
-		L.Push(L.NewFunction(self.reloadByLua))
-	case "close":
-		L.Push(L.NewFunction(self.closeByLua))
-	default:
-		L.Push(lua.LNil)
-	}
-	return 1
-}
-
-func Set(L *lua.LState) int {
-	self := CheckTailUserData(L, 1)
-	name := L.CheckString(2)
-
-	switch name {
-	case "enable":
-		self.C.enable = L.CheckString(3)
-	case "name":
-		self.C.name = L.CheckString(3)
-	case "path":
-		self.C.path = L.CheckString(3)
-	case "offset_file":
-		self.C.offsetFile = L.CheckString(3)
-	case "buffer":
-		self.C.buffer = L.CheckInt(3)
-	case "transport":
-		self.transport = tp.CheckTunnelUserData(L , 3)
-	}
-	return 0
-}
-
-func (t *Tail) ToUserData(L *lua.LState) *lua.LUserData {
-	ud := L.NewUserData()
-	ud.Value = t
-	mt := L.GetTypeMetatable(MT)
-	L.SetMetatable(ud, mt)
+	ud := &lua.LightUserData{ Value: tail }
 	return ud
 }
 
-func(self *Tail) reloadByLua(L *lua.LState) int {
-	self.Reload()
-	return  0
-}
-
-func(self *Tail) closeByLua(L *lua.LState) int {
-	self.Close()
-	return  0
+func LuaInjectApi(L *lua.LState, parent *lua.LTable) {
+	L.SetField(parent , "tail" , lua.NewGFunction(injectTail))
 }
