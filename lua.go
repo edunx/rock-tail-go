@@ -44,6 +44,11 @@ func (t *Tail) LDebug(L *lua.LState , args *lua.Args) lua.LValue {
 	return lua.LNil
 }
 
+func (t *Tail) LToJson(L *lua.LState , args *lua.Args) lua.LValue {
+	v , _ := t.ToJson()
+	return lua.LString(v)
+}
+
 func (t *Tail) Index(L *lua.LState , key string) lua.LValue {
 
 	if key == "transport"  { return t.transport.ToLightUserData(L) }
@@ -51,6 +56,7 @@ func (t *Tail) Index(L *lua.LState , key string) lua.LValue {
 	if key == "close"      { return lua.NewGFunction(t.LClose)     }
 	if key == "start"      { return lua.NewGFunction(t.LStart)     }
 	if key == "debug"      { return lua.NewGFunction(t.LDebug)     }
+	if key == "json"       { return lua.NewGFunction(t.LToJson)    }
 
 	return lua.LNil
 }
@@ -74,6 +80,6 @@ func injectTail(L *lua.LState , args *lua.Args) lua.LValue {
 	return ud
 }
 
-func LuaInjectApi(L *lua.LState, parent *lua.LTable) {
-	L.SetField(parent , "tail" , lua.NewGFunction(injectTail))
+func LuaInjectApi(L *lua.LState, parent *lua.UserKV) {
+	parent.Set("tail" , lua.NewGFunction(injectTail))
 }
